@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Potential Billing Calculator and Currency Converter</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #d4c1f0 0%, #fbcfe8 40%, #bae6fd 100%);
+            font-family: 'Calibri', 'Candara', 'Segoe UI', 'Optima', Arial, sans-serif;
+            color: #1e1b4b;
+            overflow-x: hidden;
+            padding: 2rem 1rem;
+        }
+
+        #rain-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+        .drop { 
+            position: absolute; top: -100px; 
+            will-change: transform; 
+            animation: fall linear forwards; 
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05));
+            font-weight: 800;
+        }
+        @keyframes fall {
+            to { transform: translateY(115vh) rotate(360deg); }
+        }
+
+        .container { position: relative; z-index: 10; max-width: 1100px; margin: 0 auto; }
+        
+        .currency-bar {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem;
+            padding: 12px; background: rgba(255, 255, 255, 0.25);
+            border-radius: 24px; border: 1.5px solid rgba(255, 255, 255, 0.6);
+            justify-content: center; backdrop-filter: blur(10px);
+        }
+
+        .ccy-btn {
+            padding: 10px 18px; border-radius: 14px; border: 1.5px solid transparent;
+            background: rgba(255, 255, 255, 0.5); cursor: pointer;
+            font-weight: 800; font-size: 0.85rem; transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .ccy-btn.active {
+            background: white; border-color: #4f46e5; color: #4f46e5;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.2);
+        }
+
+        .main-grid { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
+        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.35); backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 28px;
+            padding: 2.5rem; box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+        }
+
+        .dark-card {
+            background: rgba(30, 41, 59, 0.92); backdrop-filter: blur(20px);
+            border-radius: 28px; padding: 2rem; color: white;
+            position: sticky; top: 1rem;
+        }
+
+        /* --- Realistic Cheque Styling --- */
+        .cheque {
+            background: #fdfaf0;
+            border: 1px solid #dcd3b8;
+            border-radius: 4px;
+            padding: 25px;
+            margin-top: 2rem;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            position: relative;
+            background-image: radial-gradient(#ece4d1 1px, transparent 0);
+            background-size: 20px 20px;
+            color: #4b4433;
+        }
+        .cheque-header { display: flex; justify-content: space-between; margin-bottom: 20px; position: relative; z-index: 2; }
+        .cheque-bank { font-weight: bold; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .cheque-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid #8b8168; padding-bottom: 5px; position: relative; z-index: 2; }
+        .cheque-label { font-size: 0.75rem; font-weight: bold; text-transform: uppercase; font-style: italic; color: #8b8168; min-width: 80px; }
+        
+        .cheque-amount-box {
+            border: 2px solid #8b8168;
+            padding: 5px 15px;
+            display: flex;
+            align-items: center;
+            background: #fff;
+            min-width: 180px;
+        }
+        .cheque-input { border: none; font-family: inherit; font-size: 1.4rem; font-weight: bold; width: 100%; outline: none; background: transparent; }
+        .ccy-select-cheque { border: none; background: transparent; font-weight: bold; font-family: inherit; cursor: pointer; font-size: 1rem; color: #4b4433; }
+
+        .cheque-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; position: relative; z-index: 2; }
+        .cheque-slot { border-bottom: 1px solid #8b8168; text-align: left; padding-bottom: 5px; }
+        .target-ccy-select { background: transparent; border: none; font-family: inherit; font-size: 0.75rem; font-weight: bold; cursor: pointer; color: #4b4433; width: 100%; }
+        .cheque-val { font-size: 1.1rem; font-weight: bold; display: block; margin-top: 2px; }
+
+        .cheque-micr { margin-top: 25px; text-align: center; font-family: 'Courier New', Courier, monospace; letter-spacing: 8px; font-size: 0.9rem; color: #4b4433; }
+
+        /* --- UI elements --- */
+        .input-group { margin-bottom: 1.5rem; }
+        label { display: block; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #4f46e5; margin-bottom: 8px; }
+        input, select.styled-select { width: 100%; padding: 14px 18px; background: white; border: 1.5px solid rgba(255,255,255,0.4); border-radius: 16px; font-size: 1rem; outline: none; font-family: inherit; }
+        .final-amt { font-size: 3rem; font-weight: bold; color: #f9a8d4; margin: 0.5rem 0; word-break: break-all; }
+        .bt-btn { flex: 1; padding: 14px; border-radius: 16px; border: 1.5px solid transparent; background: rgba(255,255,255,0.3); cursor: pointer; font-weight: 700; transition: 0.3s; font-family: inherit; }
+        .bt-btn.active { background: white; border-color: #4f46e5; color: #4f46e5; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+        .live-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(34, 197, 94, 0.2); color: #22c55e;
+            padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800;
+        }
+        .dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+
+    <div id="rain-wrap"></div>
+
+    <div class="container">
+        <header style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="font-size: 2.5rem; color: #1e1b4b;">Potential Billing Calculator and Currency Converter</h1>
+            <p style="letter-spacing: 2px; font-weight: 700; opacity: 0.7;">✧ GLOBAL FOREX ENGINE ✧</p>
+        </header>
+
+        <div class="currency-bar">
+            <button class="ccy-btn active" onclick="setBaseCcy('HKD', this)">HKD</button>
+            <button class="ccy-btn" onclick="setBaseCcy('USD', this)">USD</button>
+            <button class="ccy-btn" onclick="setBaseCcy('THB', this)">THB</button>
+            <button class="ccy-btn" onclick="setBaseCcy('JPY', this)">JPY</button>
+            <button class="ccy-btn" onclick="setBaseCcy('PHP', this)">PHP</button>
+            <button class="ccy-btn" onclick="setBaseCcy('SGD', this)">SGD</button>
+            <button class="ccy-btn" onclick="setBaseCcy('IDR', this)">IDR</button>
+        </div>
+
+        <div class="main-grid">
+            <section>
+                <div class="glass">
+                    <div style="background: rgba(219, 39, 119, 0.1); padding: 15px; border-radius: 20px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(219, 39, 119, 0.2);">
+                        <div style="color:#db2777;">
+                            <span style="font-weight: 800; font-size: 0.9rem;">🇯🇵 JAPAN PARTNER MODE</span>
+                            <p style="font-size: 0.7rem; opacity: 0.8; margin-top: 2px;">Capped 400k JPY Deduction Active</p>
+                        </div>
+                        <input type="checkbox" id="japanMode" onchange="toggleJapanMode()" style="width: 22px; height: 22px; cursor: pointer;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="input-group">
+                            <label id="salaryLabel">Monthly Base Salary (HKD)</label>
+                            <input type="text" id="salary" value="30,000" oninput="formatAndCalc(this)">
+                        </div>
+                        <div class="input-group" id="multiplierContainer">
+                            <label>Annual Multiplier</label>
+                            <select id="multiplier" class="styled-select" onchange="updateCalc()">
+                                <option value="12">x12 months</option><option value="13">x13 months</option><option value="14">x14 months</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="input-group"><label>Fee %</label><input type="number" id="fee" value="23" oninput="updateCalc()"></div>
+                        <div class="input-group"><label>Additional Billables</label><input type="text" id="additional" value="0" oninput="formatAndCalc(this)"></div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Sign-on Bonus</label>
+                        <input type="text" id="signon" value="0" oninput="formatAndCalc(this)">
+                    </div>
+
+                    <label>Billing Type</label>
+                    <div style="display: flex; gap: 12px;">
+                        <button id="btn360" class="bt-btn active" onclick="setBilling(1, this)">360 Full</button>
+                        <button id="btn180" class="bt-btn" onclick="setBilling(0.5, this)">180 Half</button>
+                    </div>
+                </div>
+
+                <div class="cheque">
+                    <div class="cheque-header">
+                        <div class="cheque-bank">Currency Converter <span id="fxTimestamp" style="font-size: 0.6rem; font-weight: normal; opacity: 0.7;"></span></div>
+                        <div style="font-family: 'Courier New', Courier, monospace; font-weight: bold;">NO. 2026-088</div>
+                    </div>
+                    
+                    <div class="cheque-row">
+                        <span class="cheque-label">Currency</span>
+                        <select id="chequeBase" class="ccy-select-cheque global-ccy-list" onchange="updateCalc()"></select>
+                        <div style="flex-grow: 1; text-align: right; display: flex; align-items: center; justify-content: flex-end;">
+                            <span class="cheque-label" style="min-width: unset; margin-right: 10px;">Amount</span>
+                            <div class="cheque-amount-box">
+                                <input type="text" id="chequeInput" value="10,000" oninput="formatAndCalc(this)" class="cheque-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cheque-row">
+                        <span class="cheque-label">Pay To</span>
+                        <span style="font-family: 'Brush Script MT', cursive; font-size: 1.4rem;">The Bearer of this Document</span>
+                    </div>
+
+                    <div class="cheque-grid">
+                        <div class="cheque-slot">
+                            <select id="t1" class="target-ccy-select global-ccy-list" onchange="updateCalc()"></select>
+                            <span id="c-v1" class="cheque-val">0</span>
+                        </div>
+                        <div class="cheque-slot">
+                            <select id="t2" class="target-ccy-select global-ccy-list" onchange="updateCalc()"></select>
+                            <span id="c-v2" class="cheque-val">0</span>
+                        </div>
+                        <div class="cheque-slot">
+                            <select id="t3" class="target-ccy-select global-ccy-list" onchange="updateCalc()"></select>
+                            <span id="c-v3" class="cheque-val">0</span>
+                        </div>
+                    </div>
+
+                    <div class="cheque-micr">⑈ 001234 ⑆ 0123456789 ⑈ 88 ⑈</div>
+                </div>
+            </section>
+
+            <aside>
+                <div class="dark-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <p style="color: #94a3b8; font-size: 0.7rem; font-weight: 800; letter-spacing: 2px;">FINAL BILLING</p>
+                        <select id="resConvert" class="global-ccy-list" onchange="updateCalc()" style="background: transparent; color: #f9a8d4; border: 1px solid #f9a8d4; font-size: 0.7rem; padding: 2px 5px; border-radius: 4px; font-family: inherit;">
+                            <option value="BASE">Standard</option>
+                        </select>
+                    </div>
+
+                    <div class="final-amt" id="resFinal">0</div>
+                    <div style="color: #cbd5e1; font-size: 0.9rem;" id="resGross">Gross: 0</div>
+
+                    <div id="japanDeductBlock" style="display: none; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #334155;">
+                        <p style="color: #f472b6; font-size: 0.75rem; font-weight: 800;">Japan Fee Deduction:</p>
+                        <div id="resDed" style="font-size: 1.1rem; color: white; margin: 5px 0;">-¥0</div>
+                        <p id="dedLabel" style="font-size: 0.6rem; color: #94a3b8;"></p>
+                    </div>
+
+                    <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #334155;">
+                        <p style="color: #94a3b8; font-size: 0.7rem; font-weight: 800; margin-bottom: 1rem;">FIXED CONVERSIONS</p>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 0.8rem;">🇭🇰 HKD</span><span id="convHKD" style="font-weight: 700;">0</span></div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 0.8rem;">🇺🇸 USD</span><span id="convUSD" style="font-weight: 700;">0</span></div>
+                        <div style="display: flex; justify-content: space-between;"><span style="font-size: 0.8rem;">🇵🇭 PHP</span><span id="convPHP" style="font-weight: 700;">0</span></div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        let baseCcy = 'HKD';
+        let billingType = 1;
+        
+        // Comprehensive Currency List
+        const FX_RATES = {
+            HKD:1, USD:0.128, THB:4.65, JPY:19.8, PHP:7.35, SGD:0.17, IDR:2050, EUR:0.12, GBP:0.10, 
+            MYR:0.61, KRW:175, VND:3250, AUD:0.19, CAD:0.17, CHF:0.11, CNY:0.92, NZD:0.21, 
+            INR:10.6, BRL:0.64, ZAR:2.4, AED:0.47, SAR:0.48, TRY:4.2, TWD:4.1
+        };
+        const syms = { 
+            HKD:'HK$', USD:'$', THB:'฿', JPY:'¥', PHP:'₱', SGD:'S$', IDR:'Rp', EUR:'€', GBP:'£', 
+            MYR:'RM', KRW:'₩', VND:'₫', AUD:'A$', CAD:'C$', CHF:'Fr', CNY:'¥', NZD:'NZ$', 
+            INR:'₹', BRL:'R$', ZAR:'R', AED:'د.إ', SAR:'ر.س', TRY:'₺', TWD:'NT$'
+        };
+
+        // Populate all Dropdowns
+        function populateCurrencyLists() {
+            const lists = document.querySelectorAll('.global-ccy-list');
+            const keys = Object.keys(FX_RATES).sort();
+            
+            lists.forEach(list => {
+                const isSummaryDropdown = list.id === 'resConvert';
+                keys.forEach(ccy => {
+                    // Prevent HKD, USD, PHP in summary to avoid duplication as requested
+                    if(isSummaryDropdown && ['HKD','USD','PHP'].includes(ccy)) return;
+                    
+                    const opt = document.createElement('option');
+                    opt.value = ccy;
+                    opt.innerText = isSummaryDropdown ? `to ${ccy}` : `${ccy} ${syms[ccy]||''}`;
+                    list.appendChild(opt);
+                });
+            });
+
+            // Set specific defaults for cheque slots
+            document.getElementById('t1').value = 'EUR';
+            document.getElementById('t2').value = 'GBP';
+            document.getElementById('t3').value = 'JPY';
+        }
+
+        function setFxTimestamp() {
+            const now = new Date();
+            document.getElementById('fxTimestamp').innerText = `(Reference: ${now.toLocaleTimeString()}, ${now.toLocaleDateString()})`;
+        }
+
+        function toggleJapanMode() {
+            const isJapan = document.getElementById('japanMode').checked;
+            document.getElementById('multiplierContainer').style.display = isJapan ? "none" : "block";
+            if(isJapan) {
+                document.getElementById('salaryLabel').innerText = "Annual Base Salary (JPY)";
+                setBaseCcy('JPY', null);
+            } else {
+                setBaseCcy(baseCcy, null);
+            }
+            updateCalc();
+        }
+
+        function setBaseCcy(ccy, btn) {
+            if(!ccy) return;
+            baseCcy = ccy;
+            if(!document.getElementById('japanMode').checked) {
+                document.getElementById('salaryLabel').innerText = `Monthly Base Salary (${ccy})`;
+            }
+            document.querySelectorAll('.ccy-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            updateCalc();
+        }
+
+        function setBilling(val, btn) {
+            billingType = val;
+            document.querySelectorAll('.bt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateCalc();
+        }
+
+        function formatAndCalc(el) {
+            let val = el.value.replace(/,/g, '');
+            if(!isNaN(val) && val.length > 0) el.value = Number(val).toLocaleString('en-US');
+            updateCalc();
+        }
+
+        function updateCalc() {
+            const isJapan = document.getElementById('japanMode').checked;
+            const salary = parseFloat(document.getElementById('salary').value.replace(/,/g, '')) || 0;
+            const mult = isJapan ? 1 : parseInt(document.getElementById('multiplier').value);
+            const fee = (parseFloat(document.getElementById('fee').value) || 0) / 100;
+            const add = parseFloat(document.getElementById('additional').value.replace(/,/g, '')) || 0;
+            const signon = parseFloat(document.getElementById('signon').value.replace(/,/g, '')) || 0;
+
+            let billable = (salary * mult) + add + signon;
+            let gross = billable * fee;
+            let deduction = 0;
+
+            if (isJapan) {
+                document.getElementById('japanDeductBlock').style.display = "block";
+                deduction = Math.min(gross * 0.10, 400000);
+                document.getElementById('resDed').innerText = `-¥${Math.round(deduction).toLocaleString()}`;
+                document.getElementById('dedLabel').innerText = (gross*0.1) > 400000 ? "(Capped 400k)" : "(10% of Gross)";
+            } else {
+                document.getElementById('japanDeductBlock').style.display = "none";
+            }
+
+            const finalValue = (gross - deduction) * billingType;
+            const outCcy = document.getElementById('resConvert').value;
+            let displayVal = finalValue;
+            let displaySym = isJapan ? '¥' : (syms[baseCcy] || baseCcy);
+
+            if(outCcy !== 'BASE') {
+                const baseHKD = isJapan ? (finalValue / FX_RATES.JPY) : (finalValue / FX_RATES[baseCcy]);
+                displayVal = baseHKD * FX_RATES[outCcy];
+                displaySym = syms[outCcy] || outCcy;
+            }
+
+            document.getElementById('resFinal').innerText = `${displaySym}${Math.round(displayVal).toLocaleString()}`;
+            document.getElementById('resGross').innerText = `Gross: ${Math.round(gross).toLocaleString()}`;
+
+            const globalHKD = isJapan ? (finalValue / FX_RATES.JPY) : (finalValue / FX_RATES[baseCcy]);
+            document.getElementById('convHKD').innerText = Math.round(globalHKD * FX_RATES.HKD).toLocaleString();
+            document.getElementById('convUSD').innerText = Math.round(globalHKD * FX_RATES.USD).toLocaleString();
+            document.getElementById('convPHP').innerText = Math.round(globalHKD * FX_RATES.PHP).toLocaleString();
+
+            const chqBase = document.getElementById('chequeBase').value;
+            const chqIn = parseFloat(document.getElementById('chequeInput').value.replace(/,/g, '')) || 0;
+            const chqHKD = chqIn / FX_RATES[chqBase];
+            ['1','2','3'].forEach(id => {
+                const target = document.getElementById(`t${id}`).value;
+                document.getElementById(`c-v${id}`).innerText = `${syms[target] || ''}${Math.round(chqHKD * FX_RATES[target]).toLocaleString()}`;
+            });
+        }
+
+        function spawnRain() {
+            const el = document.createElement('div');
+            el.className = 'drop';
+            el.textContent = ['$', '€', '¥', '£', '฿', '₱'][Math.floor(Math.random()*6)];
+            el.style.left = Math.random() * 100 + 'vw';
+            el.style.fontSize = Math.random() * 30 + 35 + 'px';
+            el.style.opacity = Math.random() * 0.15 + 0.05;
+            el.style.color = `hsl(${Math.random() * 360}, 60%, 65%)`;
+            el.style.animationDuration = Math.random() * 6 + 10 + 's';
+            document.getElementById('rain-wrap').appendChild(el);
+            setTimeout(() => el.remove(), 16000);
+        }
+        setInterval(spawnRain, 800);
+        
+        // Init
+        populateCurrencyLists();
+        setFxTimestamp();
+        updateCalc();
+    </script>
+</body>
+</html>
